@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'dev_preview.dart';
+
 void main() {
+  setUpDevPreview();
   runApp(const MyApp());
 }
 

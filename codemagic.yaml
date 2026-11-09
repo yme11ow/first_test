@@ -1,4 +1,53 @@
 workflows:
+  # Main loop: build in the cloud -> upload to TestFlight -> install on iPhone
+  # via the TestFlight app. No UDID registration, works from anywhere.
+  # Start it manually in the Codemagic UI, or push a tag:  git tag tf-3 && git push origin tf-3
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: code_magic
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        BUNDLE_ID: com.yusufali.firstTest
+        # Point the app at your C# backend (dev tunnel / hosted URL).
+        API_BASE_URL: https://example.invalid
+      groups:
+        - ios_signing # holds CERTIFICATE_PRIVATE_KEY (see README)
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "tf-*"
+    scripts:
+      - name: Get dependencies
+        script: flutter pub get
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  # Development-signed IPA. Only installs on iPhones whose UDID is registered
+  # in your Apple Developer account. Prefer ios-testflight above.
   ios-dev:
     name: iOS Dev Build
     instance_type: mac_mini_m2
@@ -8,13 +57,17 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
+      vars:
+        BUNDLE_ID: com.yusufali.firstTest
+      groups:
+        - ios_signing
     scripts:
       - name: Get dependencies
         script: flutter pub get
       - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.yusufali.firstTest" \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates

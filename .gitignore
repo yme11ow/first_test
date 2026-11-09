@@ -46,3 +46,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# iOS signing keys
+ios_dist_key*
+*.p12
+*.p8
+*.mobileprovision
